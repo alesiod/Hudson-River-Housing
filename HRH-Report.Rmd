@@ -1,0 +1,420 @@
+---
+title: "Hudson River Housing 2023 HMIS Data"
+subtitle: "Vassar College Math-301"
+author: "Alesio Dosti, Audrey Myers, and Ian Zumpano"
+date: "April 2024"
+output: pdf_document    
+toc: true
+---
+
+```{r load packages, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, out.width = "70%", out.height = "70%", fig.align = "center")
+library(tidyverse)
+library(kableExtra)
+```
+
+```{r load data}
+data <- read.csv("2023HRH.csv", check.names = FALSE, fileEncoding = "Latin1", na.strings="")
+colnames(data) <- make.names(colnames(data), unique = TRUE)
+```
+
+```{r removing NA columns}
+#Creates a list of all variables being removed from the dataset (contain only NA values)
+NA_vars <- data[,colSums(is.na(data))==nrow(data)]
+NA_var_names <- colnames(NA_vars)
+
+#Filter the dataset to exclude any columns with only NA values
+data <- data[,colSums(is.na(data))<nrow(data)]
+```
+
+
+```{r recoding variables}
+data$Race..HMIS. <- 
+  fct_collapse(data$Race..HMIS., 
+               Black = "Black, African American, or African", 
+               N_A = c("Client refused", "Data not collected", ""),
+               AmericanIndian_AlaskanNaitive_Indegenous = "American Indian, Alaska Native, or Indigenous", 
+               White = "White", 
+               Hawaiian_PacificIslander = "Native Hawaiian or Pacific Islander", 
+               Asian = "Asian or Asian American", 
+               Hispanic_Latinx = "Hispanic/Latina/e/o",
+               White_HispLatinx = c("White;Hispanic/Latina/e/o", "Hispanic/Latina/e/o;White"), 
+               Black_HispLatinx = "Black, African American, or African;Hispanic/Latina/e/o", 
+               other_level="2+ Races")
+
+data$Gender..HMIS. <- 
+  fct_collapse(data$Gender..HMIS., 
+               NonBinary_Trans_Questioning = c("Non-Binary", "Questioning", "Transgender","Female,Male"))
+```
+# Introduction
+In this report, we explore 2023 data from the Homeless Management Information System (HMIS) of Hudson River Housing. This data includes any individual who was in the system during the year of 2023. It is important to note that this dataset only included one entry per client ID. This means that if a resident were to be admitted and discharged multiple times within the year, this dataset would only include one of those admissions/discharges.
+
+We visualize the demographics of guests and residents served by Hudson River Housing, investigate length of program stay across programs, focusing on emergency, transitional, and permanent supportive housing, and explore the data quality.
+
+\clearpage 
+
+# Demographic Information
+
+The greatest proportion of individuals in Hudson River Housing's system in 2023 were in an emergency housing program (Figure 1).
+Figures 2-6 show that the population that HRH serves is diverse; there is no monolithic demographic group. Gender is fairly evenly split, age is widely distributed, and race also has no one dominant group. 
+
+We also see this for the length of stay in the individual's prior living situation (Figure 7). The highest number of residents are at two extremes of the spectrum: one night or less, and one year or more.  
+
+
+```{r fig.cap = "This graph displays the distribution of HMIS Residents by Project Type in increasing order."}
+ggplot(data, aes(x= reorder(HMIS.Project.Type, HMIS.Project.Type, FUN=length))) +
+  geom_bar(fill="#537C39") +  ggtitle("Number of Individuals by Project Type") + xlab("HMIS Project Type") + ylab("Number of People") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1, color = "#444E89"),
+        axis.title.x = element_text(color = "#444E89"), 
+        axis.title.y = element_text(color = "#444E89"),
+        plot.title = element_text(color = "#444E89")) 
+```
+
+```{r fig.cap = "This graph shows the distribution of Resident Gender in HMIS. NA in this context represents the number of no inputs into the dataset for Gender."}
+ggplot(data, aes(x=Gender..HMIS.)) + geom_bar(fill="#537C39") + 
+  ggtitle("Gender of Clients in System") + xlab("Gender") + ylab("Number of People") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1, color = "#444E89"),
+        axis.title.x = element_text(color = "#444E89"), 
+        axis.title.y = element_text(color = "#444E89"),
+        plot.title = element_text(color = "#444E89"))
+```
+
+
+```{r fig.cap = "This barplot shows the Age of Residents at admission distributed across the entire dataset. The spike around 120 is inaccurate and likely due to case managers' method of inputting missing data, which is discussed at greater length in the Universal Data Elements and Missing Data Section."}
+ggplot(data, aes(x=Age.at.Admission)) + geom_bar(fill="#537C39") + ggtitle("Age of Residents at Admission") + xlab("Age") + ylab("Number of People") +
+  theme(strip.text = element_text(size = 4, color = "#537C39"),
+    axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1, color = "#537C39"),
+        axis.title.x = element_text(color = "#444E89"), 
+        axis.title.y = element_text(color = "#444E89"),
+        plot.title = element_text(color = "#444E89")) 
+```
+
+```{r include = FALSE}
+#prior living situation ordered by count
+ggplot(data, aes(x=reorder(Length.of.Stay.in.Prior.Living.Situation..Admission.,Length.of.Stay.in.Prior.Living.Situation..Admission.,FUN=length))) + 
+  geom_bar() + ylab("Number of People") +
+  ggtitle("Length of Stay in Prior Living Situation") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1, color = "dark green"))
+```
+
+```{r fig.cap = "This density graph displays the distribution of Age at Admission for each Program Type in the dataset. The different curves provide a visual for what ages the data is distributed amongst in each Program Type.", out.width = "100%", fig.width = 10}
+ggplot(data, aes(x=Age.at.Admission, fill = Program.Type)) + geom_density() + ggtitle("Age of Residents by Program Type") + facet_wrap(~Program.Type, ncol = 5) + xlab("Age") + ylab("Density") +
+  theme(strip.text = element_text(size = 4, color = "#537C39"),
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, color = "#537C39"),
+        axis.title.x = element_text(color = "#444E89"), 
+        axis.title.y = element_text(color = "#444E89"),
+        plot.title = element_text(color = "#444E89")) 
+```
+
+```{r fig.cap = "These histogram graphs display the distribution of Age at Admission for each Program Type in the dataset. You can notice trends by seeing spikes in certain ages for different program types. ",out.width="100%",fig.width = 10}
+ggplot(data, aes(x=Age.at.Admission, fill = Program.Type)) + geom_bar() + ggtitle("Age of Residents by Program Type") + facet_wrap(~Program.Type, ncol = 5) + xlab("Age") + ylab("Number of People") +
+  theme(strip.text = element_text(size = 4, color = "#537C39"),
+    axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1, color = "#537C39"),
+        axis.title.x = element_text(color = "#444E89"), 
+        axis.title.y = element_text(color = "#444E89"),
+        plot.title = element_text(color = "#444E89")) 
+```
+
+```{r fig.cap = "This graph displays the distribution of Race across the entire dataset. N-A in this context represents inputs such as clients refused to answer, data not collected, etc. Whereas NA represents the number of no inputs."}
+ggplot(data, aes(x=reorder(Race..HMIS.,Race..HMIS.,FUN=length))) +
+  geom_bar(fill="#537C39") + 
+  ggtitle("Race of Residents in HMIS") +
+  xlab("Race") + ylab("Number of People") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1, color = "#444E89"),
+        axis.title.x = element_text(color = "#444E89"), 
+        axis.title.y = element_text(color = "#444E89"),
+        plot.title = element_text(color = "#444E89")) 
+```
+
+
+```{r fig.cap = "This graph shows the distribution of lengths of stay in the individual's living situation prior to admission. N/A in this context represents the number of times NA was inputted into the dataset for this variable, NA represents no inputs."}
+LOS_prior_fct <- factor(data$Length.of.Stay.in.Prior.Living.Situation..Admission., ordered = TRUE, c("One night or less", "Two to six nights", "One week or more, but less than one month","One month or more, but less than 90 days","90 days or more but less than one year","One year or longer","Client doesn't know", "Client refused", "Data not collected","N/A", NA))
+ggplot(data, aes(x=LOS_prior_fct)) + 
+  geom_bar(fill = "#537C39") + 
+  ggtitle("Resident Length of Stay in their Prior Living Situation") +
+ xlab("Length of Stay in Prior Living Situation") + ylab("Number of People") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1, color = "#444E89"),
+        axis.title.x = element_text(color = "#444E89"), 
+        axis.title.y = element_text(color = "#444E89"),
+        plot.title = element_text(color = "#444E89")) 
+```
+
+\clearpage
+
+# Trends in Length of Stay
+
+Hudson River Housing offers many services to the community, including different types of affordable housing options, including emergency shelter, transitional housing, permanent supportive housing, and permanent affordable housing. In this section, we will look at one measure of the performance of these housing types: the length of program stay. This variable contains information about the number of days the individual has been in the system; this seems to be equivalent to either the number of days between admission and discharge, or if the individual has not yet been discharged, the difference between the admission date and the report generation date. As such, the reliability of this information depends on the accuracy of discharge data. For emergency shelters, individuals or households are discharged if they have not appeared at the shelter in the previous 48 hours.
+
+We will also explore the question of whether there are certain characteristics related to a client's previous experience that might be related to, or predict, whether they stay in their program for longer or shorter. In particular, we were curious if there was any relationship between the length of program stay and the two following variables: prior transience, as measured by how long they lived in their prior living situation, and chronic homelessness.
+
+## Summarizing Length of Stay for Each Program Type
+
+
+```{r subset data to diff program types}
+transitionaldata <- filter(data, HMIS.Project.Type == "Transitional Housing")
+emergencydata <- filter(data, HMIS.Project.Type == "Emergency Shelter - Entry Exit")
+phdata <- filter(data, HMIS.Project.Type == "PH - Permanent Supportive Housing")
+```
+
+```{r LOS tables by program}
+LOS_by_program <- data %>% group_by(Program) %>% summarise("Number of Clients" = n(),"Mean (Days)" = round(mean(Length.of.Program.Stay), 2), "Median (Days)" = median(Length.of.Program.Stay))
+
+LOS_by_program <- LOS_by_program %>% arrange(desc(LOS_by_program[2]))
+knitr::kable(LOS_by_program, caption="Length of Stay (Days) by HRH Program")
+
+LOS_by_program_type <- data %>% group_by(Program.Type) %>% summarise("Number of Clients" = n(),"Mean (Days)" = round(mean(Length.of.Program.Stay), 2), "Median (Days)" = median(Length.of.Program.Stay))
+
+LOS_by_program_type <- LOS_by_program_type %>% arrange(desc(LOS_by_program_type[2]))
+knitr::kable(LOS_by_program_type, caption="Length of Stay (Days) by Program Type")
+```
+
+```{r fig.cap = "The length of program stays within specific Emergency Housing programs is shown, with a line at 90 days, representing the ideal time by which guest would be discharged"}
+
+ggplot(data=emergencydata, aes(x=Length.of.Program.Stay))+ geom_histogram() +facet_wrap(~Program, nrow=1)+geom_vline(xintercept=90, linetype="dashed") + xlab("Length of Program Stay (Days)") + ggtitle("Length of Stay in Emergency Housing") +annotate("text", x=120, y=150, size = 3, label="90 Days", angle=270) + ylab("Number of People")
+```
+
+```{r fig.cap = "The length of program stays within specific Transitional Housing programs is shown, with a line at 2 years, representing the HUD-specified maximum term of stay"}
+ggplot(data=transitionaldata, aes(x=Length.of.Program.Stay))+ geom_histogram() +facet_wrap(~Program, nrow=1) + geom_vline(xintercept=720, linetype="dashed") + xlab("Length of Program Stay (Days)") + ggtitle("Length of Stay in Transitional Housing") +  annotate("text", x=950, y=12, size = 3, label="730 Days = 2 Years", angle=270) + ylab("Number of People")
+```
+
+When we look at the length of stay for specific programs, the family-oriented services have higher median lengths of stay within emergency and transitional housing, compared to the services for individuals. Figure 8 shows the distribution of length of stay within emergency housing programs. The "ideal" time by which a guest would be moved out of emergency housing is 90 days, indicated by the dotted line in Figure 8. Transitional housing is intended to last for a maximum length of 24 months, as indicated by the dotted line in Figure 9. This difference between the distributions of length of stay in family programs versus in individual programs is in line with observations of the additional difficulty of finding affordable housing for families compared to individuals.
+
+Tables 1 and 2 provide a breakdown of length of stay for each program and program type, sorted by the number of individuals receiving services from the program. One aspect to note is the discrepancy between the mean and median length of stay for many programs. When the mean is higher than the median, it indicates that the data is right-skewed; the values above than the median (the 50th percentile of the values) are more extreme and raise the mean. Within emergency shelter in Table 2, the mean is likely skewed by Gannett House, which provides emergency shelter for families. As seen in Table 1, the mean length of stay for Gannett House, roughly 143 days, is much larger than the mean for other emergency shelter programs such as Webster house, which has a mean length of stay of 37 days. This further highlights the shortfalls in availability of units in transitional and permanent housing for larger households.
+
+## Modeling Length of Stay for Each Program Type
+
+```{r EDAplot function}
+# inputs are dataframe, index of categorical predictor column, 
+#   index of continuous outcome column
+EDAplot <- function(df, colindexpred, colindexout, includena=TRUE){
+  mytitle <- paste(colnames(df)[colindexout], " vs. ", colnames(df)[colindexpred])
+  havedataprop <- 1-colSums(is.na(df))/nrow(df)
+  propvalue <- paste("Proportion of observations/total rows: ",
+                     round(havedataprop[colindexpred], digits=3))
+  
+  df <- df[,c(colindexpred,colindexout)]
+  if (includena == FALSE){df <- na.omit(df)}
+  
+  myplot <- ggplot(data = df, aes(x = as.factor(df[,1]), y=df[,2])) + 
+    geom_boxplot() +       
+    theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))+
+    ggtitle(mytitle, subtitle = propvalue) +
+    facet_wrap(~modeldata$HMIS.Project.Type)
+  print(myplot)
+}
+```
+
+```{r setup for models}
+#filter to only three program types
+modeldata <- data %>% filter(HMIS.Project.Type %in% c("Emergency Shelter - Entry Exit", "Transitional Housing", "PH - Permanent Supportive Housing"))
+
+#reduce number of levels of prior living situation
+modeldata$Length.Prior.Living.Situation <- 
+   fct_collapse(modeldata$Length.of.Stay.in.Prior.Living.Situation..Admission., 
+                lessthan1week = c("One night or less","Two to six nights"),
+                weekto1mo = c("One week or more, but less than one month"),
+                moto1yr = c("One month or more, but less than 90 days", "90 days or more but less than one year"),
+                over1yr = "One year or longer",
+                other_level=NA)
+modeldata$Length.Prior.Living.Situation <- fct_relevel(modeldata$Length.Prior.Living.Situation, "over1yr", "moto1yr", "weekto1mo")
+#make NA level register as missing
+modeldata$Length.Prior.Living.Situation <- factor(modeldata$Length.Prior.Living.Situation, exclude = NA)
+
+
+modeldata$timesonstreet.ES.HS.3yrs <- 
+   fct_collapse(modeldata$X.Regardless.of.where.they.stayed.last.night..Number.of.times.the.client.has.been.on.the.streets..in.ES..or.SH.in.the.past.three.years.including.today..Admission., 
+                "none" = "N/A",
+                "one" = "One time",
+                "two" = "Two times",
+                "three" = "Three times",
+                "four" = "Four or more times",
+                other_level= NA)
+modeldata$timesonstreet.ES.HS.3yrs <- fct_relevel(modeldata$timesonstreet.ES.HS.3yrs, "none", "one", "two", "three")
+
+```
+
+```{r}
+modeldatasubset <- modeldata %>% select(c("Global.Household.ID","Length.Prior.Living.Situation","Chronically.Homeless..Admission.","HMIS.Project.Type","Length.of.Program.Stay","Program","Program.Type"))
+modeldistinct <- distinct(modeldatasubset)
+
+#primaryclientsonly
+model_selfonly <- filter(modeldata, Relationship.to.Primary.Client == "Self")
+```
+
+
+```{r Separate models}
+#R excludes where program stay=0 for log (only 1 case where length of stay=0)
+emergency <- lm(data=filter(model_selfonly, HMIS.Project.Type == "Emergency Shelter - Entry Exit"), log(Length.of.Program.Stay) ~
+               Length.Prior.Living.Situation+
+               Chronically.Homeless..Admission.
+             )
+
+#should reduce # of predictors because sample size smaller
+transitional <- lm(data=filter(model_selfonly, HMIS.Project.Type == "Transitional Housing"), log(Length.of.Program.Stay) ~
+               Length.Prior.Living.Situation+
+               Chronically.Homeless..Admission.
+             )
+permsupportive <- lm(data=filter(model_selfonly, HMIS.Project.Type == "PH - Permanent Supportive Housing"), log(Length.of.Program.Stay) ~
+               Length.Prior.Living.Situation+
+               Chronically.Homeless..Admission.
+             )
+```
+
+```{r Ftest for transitional model, include = FALSE} 
+transitionalnull <- lm(data=filter(model_selfonly, HMIS.Project.Type == "Transitional Housing")[complete.cases(model_selfonly[ , c("Chronically.Homeless..Admission.", "Length.Prior.Living.Situation")]),], log(Length.of.Program.Stay) ~
+               Chronically.Homeless..Admission.)
+anova(transitionalnull, transitional)
+```
+
+```{r residual plots, eval = FALSE}
+ggplot(emergency, aes(x = .fitted, y = .resid)) + geom_point()
+ggplot(transitional, aes(x = .fitted, y = .resid)) + geom_point()
+ggplot(permsupportive, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+We fit three linear regression models with a log-transformed outcome of length of program stay and predictors length of stay in prior living situation (a categorical variable) and chronic homelessness (a binary variable). We used three separate models given the differences in the scale and also meaning behind the "length of program stay" variable across programs (particularly given the specifics of the emergency housing discharge procedure) and the results can be seen in Table 3. For more model details and a more technical summary of the results, see the Appendix. 
+
+Interpretation of Table 3 is as follows. The first row shows the expected length of stay for the "reference" categories, i.e. someone who is not chronically homeless and has a length of stay prior living situation of over a year. The subsequent rows give the factor by which the expected length of stay increases relative to the value in row 1 as the relevant characteristic changes. For example, based on this model, someone in emergency housing who is chronically homeless and prior living situation greater than a year has expected length of stay $12.05\times 0.77 \approx 9$ days. Someone in permanent supportive housing who is chronically homeless and lived in their prior living situation for less than a week has an expected length of stay of about $1016.52 \times 1.33 \times 0.46 \approx 622$ days. 
+
+The most notable results relate to transitional and permanent supportive housing. 
+In transitional housing, the model estimates that residents who lived in their prior living situation for over a year have longer expected lengths of stay compared to those whose length of prior living situation, after adjusting for chronic homelessness status.
+In permanent supportive housing, the model estimate shows that the expected length of stay for an individual who is chronically homeless at admission is about half the length of stay of that of a non-chronically homeless individual. These two results are statistically significant for $\alpha = 0.10$; i.e. we are reasonably confident that there is this true difference.
+
+```{r sample code for predicting, include = FALSE}
+#gives expected log length of stay (days). exponentiate to get days
+predict(permsupportive, newdata = list(Chronically.Homeless..Admission.="Yes",Length.Prior.Living.Situation="lessthan1week"))
+```
+
+
+```{r}
+emergtable <- summary(emergency)$coefficient
+transtable <- summary(transitional)$coefficients
+permtable <- summary(permsupportive)$coefficients
+
+modelrows <- c("Expected Stay (Days): Non-chronically-homeless, prior living situation > 1 year", "Times Longer for Prior Living Situation 1 month-1 year", "Times Longer for Prior Living Situation 1 week-1 month", "Times Longer for Prior Living Situation less than 1 week", "Times Longer for Chronically Homeless")
+
+rownames(emergtable) <- modelrows
+rownames(transtable) <- modelrows
+rownames(permtable) <- modelrows
+
+emergtable[,"Estimate"] <- exp(emergtable[,"Estimate"]) 
+transtable[,"Estimate"] <- exp(transtable[,"Estimate"]) 
+permtable[,"Estimate"] <- exp(permtable[,"Estimate"]) 
+
+combinedtable <- cbind("Emergency" = emergtable[,"Estimate"], "Transitional" = transtable[,"Estimate"], "Permanent Supportive" = permtable[,"Estimate"])
+```
+
+```{r}
+estimatekable <- knitr::kable(combinedtable, digits = c(2,2,2,3), caption="Model for Length of Stay in Housing (Days)") 
+add_header_above(estimatekable, header = c(" " = 1, "Model Estimate by Housing Type"=3))%>% kable_styling(font_size = 8)
+```
+
+
+\clearpage
+
+# Data Completeness and Quality
+
+## Universal Data Elements and Missing Data
+One of our goals in this analysis was to explore patterns among incomplete data from 2023. In this analysis, we focused primarily on the Universal Data Elements (UDEs). Because collection of Universal Data Elements is required, we look at instances of missing values for these variables.
+
+Our main focus is examining the incomplete data centered around the universal data elements. Because we did not have access to identifying information such as birthdays, SSNs and other UDEs, we examined a subset of these variables. These variables, as shown in Table 5, have varying degrees of missingness. Additionally, the separation of this missingness into “data not inputted” and “data not collected” gives more insight as to where these missing entries are coming from. “Data not inputted” denotes a question that was left blank on an intake form, while “data not collected” encompasses the responses “data not collected”, “Client refused”, “Client doesn’t know”, or “N/A”. The significance of the missingness in Table 5 also varies between the different variables. As we discussed in our meetings, the continuum of care variable has a high degree of missingness, but this is likely deliberate and is being used to help residents find housing more efficiently. A visualization of the distribution of missing data by program and program type is displayed in Figure 11. On the other hand, more diligent collection of the gender, disabling condition, and veteran status variables would lead to more complete data. This would allow for the data to represent a more complete picture of the population that HRH serves.
+
+One of the universal data elements not included in Table 5 was age. Because a resident’s birthday cannot be skipped at admission, we have responses from all residents about age in the dataset. In responses to the age variable, we saw that 97 people were listed as being between 120-122 years old. In conversations with HRH, we determined that this was likely a method used by case managers in situations where the date of birth was not obtained from the resident. In the data, we saw that these people aged 120+ came from only 3 programs: “NYS ESG CV HP”, Pete’s Place, and “SOP”, which is shown in Figure 10. Because we only saw 97 instances of ages that we could definitively identify as not being plausible, and these entries came from only 3 programs, it is impossible to say if other locations are using different standards for missing DOB. With this in mind, we recommend that HRH implements a standard protocol for inputting a missing DOB into the HMIS system. This date should be standardized across all programs in order to maintain consistency in the data, and should be easily identifiable as a missing entry (eg. age 120+). Although our analysis mainly focused on age, a protocol for standardization of missing variables should be implemented across any required variables where this problem could arise.
+
+## Other Data Recommendations
+Although we focused mainly on the universal data elements in our analysis, we also wanted to explore which variables that were not being collected might have a correlation with length of stay. The goal of this analysis was to identify a handful of variables that could be used as predictors in future modeling of length of stay. In these variables, we saw a difference in the median lengths of stay between different responses to the variables, however these variables also had significant missingness. Table 6 displays the 4 variables we identified from this analysis, as well as the percentage that these variables were missing in the dataset. We recommend that these variables be prioritized in future data collection. 
+
+Another recommendation is to define and record an additional variable for positive versus negative outcomes at discharge, or some other time point. This would be somewhat subjective, but defining outcomes would allow for calculation of the rates of these positive/negative outcomes, and comparisons can be made to inform future policies and procedures.
+
+Additionally, it is worth noting that 15 variables had no responses, meaning that nobody had answered them in the admission of any resident. These variables are listed in Table 3.
+
+```{r}
+excludedvars <- as.data.frame(variable.names(NA_vars))
+excludedvars_kable <- knitr::kable(excludedvars, caption="Table of variables that were completely missing (no data inputted for any resident). These were variables that we excluded from the dataset for our analysis.") 
+add_header_above(excludedvars_kable, header = "Variable Name")
+```
+
+```{r include = FALSE}
+#dont have prior living situation
+data %>% select(Age.at.Admission, Gender..HMIS., Disabling.Condition, Race..HMIS., Veteran.Status, Permanent.Housing.Move.in.Date, Relationship.to.Primary.Client, Enrollment.CoC..Admission.)
+
+
+#barplot colored by completely
+#separate plot for NAs by program type
+data %>% count(Age.at.Admission) #8 missing (age 0, self)
+data %>% count(Gender..HMIS.) #24 NA, 27 data not collected
+data %>% count(Disabling.Condition) #447 data not collected
+data %>% count(Race..HMIS.) #3 NA
+data %>% count(Veteran.Status) #370	data not collected
+data %>% count(Permanent.Housing.Move.in.Date, sort = TRUE) #2153 NA
+data %>% count(Relationship.to.Primary.Client) #what does N/A mean?
+data %>% count(Enrollment.CoC..Admission.) #508 NA
+
+```
+
+```{r}
+# data %>% filter(Age.at.Admission == 0 & Relationship.to.Primary.Client == "Self") %>% ggplot(aes(y = Program, fill = Program.Type)) + geom_bar() + ggtitle("Age 0 and Relation to Primary Client is Self")
+# 
+# #data %>% filter(Age.at.Admission == 0 & Pregnancy.Status..Admission. == "Yes")
+# #data %>% filter(Age.at.Admission == 0) %>% count(Relationship.to.Primary.Client) mostly self
+# #check on relationship to primary client
+```
+
+```{r fig.cap = "Age Greater than 100"}
+#data %>% filter(Age.at.Admission == 0 & Relationship.to.Primary.Client == "Self") %>% ggplot(aes(y = Total_Missing, fill = Program.Type)) + geom_bar()
+
+data %>% filter(Age.at.Admission > 100) %>% ggplot(aes(x = Age.at.Admission, fill = Program)) + geom_bar(position = "dodge")+ ggtitle("Count of Age over 100 by Program")
+```
+
+```{r fig.cap = "CoC Enrollment Missing Entries by Program"}
+data %>% filter(is.na(Enrollment.CoC..Admission.)) %>% ggplot(aes(y = Program, fill = Program.Type)) + geom_bar() + ggtitle("CoC NA counts by Program")
+```
+
+
+```{r tables}
+missing_data_table <- data.frame(variable=c('Gender..HMIS.', 'Disabling.Condition','Race..HMIS.','Veteran.Status','Enrollment.CoC..Admission.'),
+                             No_Data_Inputted=as.integer(c(24, 0, 3, 0, 508)),
+                             Data_Not_Collected=as.integer(c(27, 447, 0, 370, 0)),
+                             Total_Missing=as.integer(c(51, 447, 3, 370, 508)))
+
+
+Data_Recs_table <- data.frame(Variable=c('On.the.night.before.did.you.stay.on.the.streets..ES.or.SH...Admission.
+', 'Total.number.of.months.homeless.on.the.street..in.ES..or.SH.in.the.past.three.years..Admission.','Sexual.Orientation','Mental.Health.Disorder..Admission'), "Percent Missing"=(c(95.90, 50.74, 91.64, 23.04)))
+
+knitr::kable(missing_data_table, caption = "Number of Missing Values Within Selected Universal Data Element Variables")
+knitr::kable(Data_Recs_table, caption = "Recommended Variables with Percent of Observations Missing")
+```
+
+
+\clearpage
+
+# Conclusion
+Data analysis can provide quantitative support for observations and experience of those who work in the system on a daily basis. Data and data visualization can also serve as tools to communicate with the general public. Lastly, standardization of data collection going forward can help guide the transition towards being more data driven 
+
+# Acknowledgements
+Thank you to Hudson River Housing for the opportunity to work with them and for trusting us with this project. 
+Special thank you for Javier Gomez for lending his expertise and time to this collaborative project.
+
+# Appendix 
+
+## Model Details
+The data for the model was restricted to include only individuals who were marked as the primary client (one representative individual per household), due to dependence, or similar values for many variables, within families. Missing data was treated as missing at random and simply excluded, but this is likely not true. As such, these results may be biased.  
+A printout of the linear regression model results is below.  
+
+Emergency Housing:
+```{r}
+summary(emergency)
+```
+
+Transitional Housing:
+```{r}
+summary(transitional)
+```
+
+Permanent Supportive Housing:
+```{r}
+summary(permsupportive)
+```
+
+\clearpage
+

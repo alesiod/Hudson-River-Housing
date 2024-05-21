@@ -1,0 +1,290 @@
+---
+title: "Project-HRH"
+author: "Alesio, Audrey, and Ian"
+date: "2/8/2024"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+data <- read.csv("2023HRH.csv", check.names = FALSE, fileEncoding = "Latin1", na.strings="")
+colnames(data) <- make.names(colnames(data), unique = TRUE)
+```
+
+```{r}
+#Creates a list of all variables being removed from the dataset (contain only NA values)
+NA_vars <- data[,colSums(is.na(data))==nrow(data)]
+NA_var_names <- colnames(NA_vars)
+NA_var_names
+```
+
+```{r}
+#Filter the dataset to exclude any columns with only NA values
+data <- data[,colSums(is.na(data))<nrow(data)]
+```
+
+```{r Variables 1-15 (Ian)}
+data %>% rename(info.consent = Info.Sharing.Level) %>% factor(info.consent, levels = c("I agree to allow my information to be shared inside the CRHMIS for coordination of care purposes.<ul><li>a) I agree to allow my information to be shared with external sources for research purposes.</li></ul>"))
+```
+
+```{r Variables 16-30 (Alesio)}
+
+```
+
+
+```{r Variables 31-45 (Audrey)}
+#each pair of newname = oldname is separated by a comma
+data <- data %>% rename(TO.AfghanistanFreedom = Theatre.of.Operations..Afghanistan..Operation.Enduring.Freedom.,
+                        TO.IraqiFreedom = Theatre.of.Operations..Iraq..Operation.Iraqi.Freedom.,
+                        TO.IraqNewDawn = Theatre.of.Operations..Iraq..Operation.New.Dawn.,
+                        TO.KoreanWar = Theatre.of.Operations..Korean.War,
+                        TO.Other = Theatre.of.Operations..Other.Peace.keeping.Operations.or.Military.Interventions,
+                        TO.PersianGulf = Theatre.of.Operations..Persian.Gulf.War..Operation.Desert.Storm.,
+                        TO.Vietnam = Theatre.of.Operations..Vietnam.War,
+                        TO.WW2 = Theatre.of.Operations..World.War.II)
+
+data <- data %>% rename(months.homeless.3y = Total.number.of.months.homeless.on.the.street..in.ES..or.SH.in.the.past.three.years..Admission.,
+                       res.type = Type.of.Residence..Admission.,
+                       vet.discharge.status = Veteran.Discharge.Status,
+                       vet.status = Veteran.Status,
+                       apprentice = Vocational.Training.Apprentice,
+                       mil.year.start = Year.Entered.Military.Service,
+                       mil.year.end = Year.Separated.from.Military.Service,
+                       last.zipcode = Zip.Code.of.Last.Permanent.Address)
+```
+
+
+```{r output new csv}
+#unsure if possible to export directly to the github repo. here you need to change
+#the code to the desired location on your computer 
+
+#write.csv(data, file='/Users/user/Desktop/new_file.csv', row.names=FALSE)
+```
+
+
+```{r Missing data}
+missingcount <- colSums(is.na(data)) 
+missingprop <- missingcount/nrow(data)
+missingdata <- cbind(missingcount, missingprop)
+colnames(missingdata) <- c("NA_count", "NA_proportion")
+```
+
+```{r Missing Data Example}
+data %>% count(If.the.person.is.60.years.of.age.or.older..score.1)
+data %>% count(Current.Age >= 60)
+
+data %>% filter(Current.Age >= 60) %>% filter(is.na(If.the.person.is.60.years.of.age.or.older..score.1))
+
+data %>% filter(Current.Age >= 60) %>% filter(If.the.person.is.60.years.of.age.or.older..score.1 == 0) %>% count(Program, sort = TRUE)
+
+data %>% filter(Current.Age >= 60) %>% filter(is.na(If.the.person.is.60.years.of.age.or.older..score.1) | If.the.person.is.60.years.of.age.or.older..score.1 == 0) %>% count(Program, sort = TRUE)
+```
+
+
+```{r plot function}
+#inputs: df: dataframe containing predictor and outcome
+#     colindexpred: index of predictor variable (categorical)
+#     colindexout: index of outcome variable (numeric)
+#     includena: default true, excludes na values if FALSE
+#note- relies on missing data proportions being saved in missingprop, 
+#     where the cols are in same order as in df
+
+EDAplot <- function(df, colindexpred, colindexout, includena=TRUE){
+  mytitle <- paste(colnames(df)[colindexout], " vs. ", colnames(df)[colindexpred])
+  propvalue <- paste("Proportion of observations/total rows: ",
+                     round(1-missingprop[colindexpred], digits=3))
+  
+  df <- df[,c(colindexpred,colindexout)]
+  if (includena == FALSE){df <- na.omit(df)}
+  
+  myplot <- ggplot(data = df, aes(x = as.factor(df[,1]), y=df[,2])) + 
+    geom_boxplot() +       
+    theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))+
+    ggtitle(mytitle, subtitle = propvalue)
+  print(myplot)
+}
+```
+
+```{r demographic plots 51-104}
+ggplot(data, aes(x=Gender..HMIS.)) + geom_bar() + 
+  ggtitle("Gender of Clients in System") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))
+
+ggplot(data, aes(x= reorder(HMIS.Project.Type, HMIS.Project.Type, FUN=length))) +
+  geom_bar() +  ggtitle("Project Type") + xlab("HMIS Project Type") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))
+
+ggplot(data, aes(x=HMIS.Household.Type..at.admission.)) + 
+  geom_bar() + ggtitle("Household Type at Admission", subtitle = round(1-missingdata["HMIS.Household.Type..at.admission.",2],digits=3)) +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))
+
+ggplot(data, aes(x=Length.of.Program.Stay, fill = Program.Type)) + geom_histogram(bins=30) + ggtitle("Length of Program Stay by Program Type")
+
+ggplot(data, aes(x=Mental.Health.Disorder..Admission.)) + geom_bar() + 
+  ggtitle("Mental Health Disorder", 
+          subtitle = round(1-missingdata["Mental.Health.Disorder..Admission.",2],digits=3)) +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))
+
+ggplot(data, aes(x=reorder(Length.of.Stay.in.Prior.Living.Situation..Admission.,Length.of.Stay.in.Prior.Living.Situation..Admission.,FUN=length))) + 
+  geom_bar() + 
+  ggtitle("Length of Stay in Prior Living Situation") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))
+
+```
+
+```{r demographic plots 1-50}
+ggplot(data.frame(data), aes(x=Did.you.stay.less.than.7.nights...Admission.)) + geom_bar()
+
+ggplot(data.frame(data), aes(x=Did.you.stay.less.than.90.days...Admission.)) + geom_bar()
+
+box_plot <- ggplot(data, aes(x=Did.you.stay.less.than.7.nights...Admission., y = Length.of.Program.Stay)) 
+box_plot + geom_boxplot()
+
+ggplot(data, aes(x=Age.at.Admission)) + geom_bar() + ggtitle("Age of Clients at Admission") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))
+
+barplot(data$Length.of.Program.Stay, names=data$Admission.Date...Project.Start.Date,
+        xlab = "Project Start Time",
+        ylab = "Length Of Stay")
+
+
+ggplot(data, aes(x=Chronically.Homeless..Admission.)) + geom_bar() + ggtitle("Chronically Homeless Clients in System") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))
+
+box_plot <- ggplot(data, aes(x=Ethnicity, y = Length.of.Program.Stay))
+box_plot + geom_boxplot()
+
+data$Admission.Date...Project.Start.Date <- as.Date(data$Admission.Date...Project.Start.Date)
+ggplot(data, aes(x=Admission.Date...Project.Start.Date, 
+       y = Length.of.Program.Stay)) + geom_point(aes(color = Admission.Date...Project.Start.Date)) +
+scale_color_continuous("Project Start Dates") +
+xlab("Project Start Time") +
+ylab("Length Of Stay") +
+  theme(axis.line = element_line(color = "black", size = 0.5))
+
+```
+
+```{r Updated Demographic Plots}
+
+ggplot(data, aes(x=Length.of.Program.Stay, fill = Program.Type)) + geom_histogram(bins=30) + ggtitle("Length of Program Stay by Program Type")
+
+ggplot(data, aes(x=Age.at.Admission, fill = Program.Type)) + geom_histogram(bins=30) + ggtitle("Age of Clients by Program Type")
+
+ggplot(data, aes(x=Age.at.Admission, y = Program.Type)) + geom_point() + ggtitle("Age of Clients by Program Type") 
+
+ggplot(data, aes(x= reorder(HMIS.Project.Type, HMIS.Project.Type, FUN=length))) +
+  geom_bar() +  ggtitle("Project Type") + xlab("HMIS Project Type") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))
+
+ggplot(data, aes(Did.you.stay.less.than.7.nights...Admission., ..count..)) + geom_bar(aes(fill = Program.Type), position = "dodge")
+
+ggplot(data, aes(Did.you.stay.less.than.90.days...Admission., ..count..)) + geom_bar(aes(fill = Program.Type), position = "dodge")
+
+ggplot(data, aes(Gender..HMIS., ..count..)) + geom_bar(aes(fill = Program.Type), position = "dodge")
+
+ggplot(data, aes(x=Age.at.Admission, fill = Program.Type)) + geom_bar() + ggtitle("Age of Clients by Program Type") + facet_wrap(~Program.Type)
+
+ggplot(data, aes(x=Length.of.Program.Stay, fill = Program.Type)) + geom_histogram() + ggtitle("Length of Program Stay by Program Type") + facet_wrap(~Program.Type)
+```
+```{r Density Plots}
+ggplot(data, aes(x=Length.of.Program.Stay, fill = Program.Type)) + geom_density() + ggtitle("Length of Program Stay by Program Type") + facet_wrap(~Program.Type) + theme(axis.text.x = element_text(angle = 45,vjust = 0.25, hjust = 0.25))
+
+ggplot(data, aes(x=Length.of.Program.Stay, fill = Program.Type)) + geom_density()+ ggtitle("Length of Program Stay by Program Type")
+
+ggplot(data, aes(x=Age.at.Admission, fill = Program.Type)) + geom_density() + ggtitle("Age of Clients by Program Type") + facet_wrap(~Program.Type)
+
+```
+
+```
+
+```{r recode race and plot}
+data$Race..HMIS. <- 
+  fct_collapse(data$Race..HMIS., 
+               Black = "Black, African American, or African", 
+               N_A = c("Client refused", "Data not collected", ""),
+               AmericanIndian_AlaskanNaitive_Indegenous = "American Indian, Alaska Native, or Indigenous", 
+               White = "White", 
+               Hawaiian_PacificIslander = "Native Hawaiian or Pacific Islander", 
+               Asian = "Asian or Asian American", 
+               Hispanic_Latinx = "Hispanic/Latina/e/o",
+               White_HispLatinx = c("White;Hispanic/Latina/e/o", "Hispanic/Latina/e/o;White"), 
+               Black_HispLatinx = "Black, African American, or African;Hispanic/Latina/e/o", 
+               other_level="2+ Races")
+
+data %>% ggplot(aes(x = Race..HMIS., y = Length.of.Program.Stay)) + geom_boxplot()+  theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))
+
+data %>% ggplot(aes(x = Race..HMIS.)) + geom_bar()+theme(axis.text.x = element_text(angle = 45,vjust = 1, hjust = 1))
+```
+
+```{r Program-specific table}
+programinfo <- data %>%  group_by(HMIS.Project.Type, Program.Type, Program) %>% summarize(n = n(), MedianLengthofStay = median(Length.of.Program.Stay))
+```
+
+```{r demographic plots 100+}
+#are there patterns between incompletely collected data and length of stay?
+
+ggplot(data = data, aes(x = On.the.night.before.did.you.stay.on.the.streets..ES.or.SH...Admission., y = Length.of.Program.Stay)) + geom_violin()
+
+#data %>% count(Other..Admission.)
+#Healthcare Variable
+
+ggplot(data = data, aes(x = Person.Type..at.admission., y = Length.of.Program.Stay)) + geom_boxplot()
+
+data %>% ggplot(aes(x = Post.Secondary.Education, y = Length.of.Program.Stay)) + geom_boxplot()
+
+#data %>% ggplot(aes(x = Preferred.Language, y = Length.of.Program.Stay)) + geom_boxplot()
+
+data %>% ggplot(aes(x = Previous.Admission., y = Length.of.Program.Stay)) + geom_boxplot()
+
+data %>% ggplot(aes(x = Program.Type, y = Length.of.Program.Stay)) + geom_boxplot()
+
+#for program type, plot average length of stay across each program type
+
+data %>% group_by(Program) %>% summarise_at(vars(Length.of.Program.Stay), list(mean = mean)) %>% ggplot(aes(x = Program, y = mean)) + geom_point()
+
+data %>% ggplot(aes(x = Race..HMIS., y = Length.of.Program.Stay)) + geom_boxplot()
+
+data %>% count(Services.Sought)
+
+data %>% count(Sexual.Orientation)
+
+data %>% ggplot(aes(x = Substance.Use.Disorder..Admission., y = Length.of.Program.Stay)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90))
+
+data %>% count(Total.number.of.months.homeless.on.the.street..in.ES..or.SH.in.the.past.three.years..Admission.)
+      
+data %>% ggplot(aes(x = Total.number.of.months.homeless.on.the.street..in.ES..or.SH.in.the.past.three.years..Admission., y = Length.of.Program.Stay)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90))
+
+mutate(data, Race..HMIS.Cat = recode(Race..HMIS., Black = "Black, African American, or African", N_A = c("Client refused", "Data not collected", ""),AmericanIndian_AlaskanNaitive_Indegenous = "American Indian, Alaska Native, or Indigenous", White = "White", Hawaiian_PacificIslander = "Native Hawaiian or Pacific Islander", Asian = "Asian or Asian American", Hispanic/Latinx = "Hispanic/Latina/e/o", White_HispLatinx = C("White;Hispanic/Latina/e/o", "Hispanic/Latina/e/o;White"), Black_HispLatinx = "Black, African American, or African;Hispanic/Latina/e/o", .default = "2+ Races"))
+
+```
+
+```{r}
+#one of the UDEs is DOB. Possibility that these dates are being inputted as the current date as a way to bypass the system
+
+data %>% filter(Age.at.Admission == 0) %>% count(Program, sort = TRUE)
+data %>% filter(Age.at.Admission == 0) %>% ggplot(aes(x = Length.of.Program.Stay)) + geom_histogram(binwidth = 5) + xlim(0, 365)
+
+data %>% filter(Age.at.Admission == 120) %>% count(Program, sort = TRUE)
+data %>% filter(Age.at.Admission == 121) %>% count(Program, sort = TRUE)
+data %>% filter(Age.at.Admission == 122) %>% count(Program, sort = TRUE)
+
+data %>% filter(Age.at.Admission <= 10 & Relationship.to.Primary.Client == "Self") %>% count(Program)
+data %>% filter(Age.at.Admission <= 10 & Relationship.to.Primary.Client == "Self") %>% select()
+householdvector <- c("408997", "H290580041", "402507", "402508", "402510", "H413945041", "402518", "402504", "199817", "H415618041", "H415623041", "405587", "397164", "402505", "401675", "404000", "H399886041", "H399891041", "H399892041", "401461", "393377", "402545")
+data %>% filter(Global.Household.ID %in% householdvector) %>% count(Global.Household.ID)
+
+data %>% filter(Gender..HMIS. == "Data not collected" | Gender..HMIS. == "") %>% count(Program, sort = TRUE)
+data %>% filter(Gender..HMIS. == "Data not collected" | Gender..HMIS. == "") %>% ggplot(aes(x = Length.of.Program.Stay)) + geom_histogram(binwidth = 5) + xlim(0, 365)
+
+data %>% filter(Enrollment.CoC..Admission. == "") %>% count(Program, sort = TRUE)
+data %>% filter(Enrollment.CoC..Admission. == "NY-000 - No Assigned CoC") %>% count(Program, sort = TRUE)
+
+data %>% count(Relationship.to.Primary.Client, sort = TRUE)
+```
+
+
+
